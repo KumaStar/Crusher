@@ -1,6 +1,8 @@
 # Builds dist\Crusher\ (app + bundled FFmpeg) and installer\Output\Crusher-Setup.exe.
 # Requires: Python 3.9+ on PATH, Inno Setup 6 (ISCC.exe), internet access for the first run.
-$ErrorActionPreference = "Stop"
+# Native tools (pip, PyInstaller, ISCC) write notices to stderr, which "Stop" would turn into
+# fatal errors, so exit codes are checked explicitly after each one instead.
+$ErrorActionPreference = "Continue"
 Set-Location $PSScriptRoot
 
 $ffDir = Join-Path $PSScriptRoot "installer\ffmpeg"
@@ -22,15 +24,15 @@ $ffExe = Join-Path $ffDir "ffmpeg.exe"
 if (-not (Test-Path $ffExe)) {
     New-Item -ItemType Directory -Force -Path $ffDir | Out-Null
     $zip = Join-Path $ffDir "ffmpeg.zip"
-    Invoke-WebRequest -Uri $ffUrl -OutFile $zip
-    Expand-Archive -Path $zip -DestinationPath $ffDir -Force
+    Invoke-WebRequest -Uri $ffUrl -OutFile $zip -ErrorAction Stop
+    Expand-Archive -Path $zip -DestinationPath $ffDir -Force -ErrorAction Stop
     $bin = Get-ChildItem -Path $ffDir -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
-    Copy-Item (Join-Path $bin.DirectoryName "ffmpeg.exe"), (Join-Path $bin.DirectoryName "ffprobe.exe") -Destination $ffDir -Force
+    Copy-Item (Join-Path $bin.DirectoryName "ffmpeg.exe"), (Join-Path $bin.DirectoryName "ffprobe.exe") -Destination $ffDir -Force -ErrorAction Stop
     Remove-Item $zip
 }
 
 # 3. Put FFmpeg next to Crusher.exe
-Copy-Item (Join-Path $ffDir "ffmpeg.exe"), (Join-Path $ffDir "ffprobe.exe") -Destination "dist\Crusher" -Force
+Copy-Item (Join-Path $ffDir "ffmpeg.exe"), (Join-Path $ffDir "ffprobe.exe") -Destination "dist\Crusher" -Force -ErrorAction Stop
 
 # 4. Build the installer
 $iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") |

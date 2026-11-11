@@ -6,3 +6,4 @@ dist/
 .venv/
 installer/ffmpeg/
 installer/Output/
+*.spec
