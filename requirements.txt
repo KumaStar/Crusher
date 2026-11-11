@@ -1,5 +1,7 @@
 customtkinter>=5.2
 Pillow>=10
-pikepdf>=8
+pikepdf>=8; not (sys_platform == "darwin" and platform_machine == "x86_64")
+# Intel Macs: pikepdf stopped publishing x86_64 macOS wheels after 10.13.0.post1
+pikepdf>=8,<=10.13.0.post1; sys_platform == "darwin" and platform_machine == "x86_64"
 # optional: iPhone photos (.heic/.heif/.avif)
 # pillow-heif
