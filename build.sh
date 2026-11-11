@@ -5,6 +5,10 @@
 #   PYTHON=python3.12 ./build.sh
 set -euo pipefail
 cd "$(dirname "$0")"
+if [[ -n "${GITHUB_ACTIONS:-}" ]]; then   # surface the failing command as a visible CI annotation
+  trap 'echo "::error title=build.sh failed::line $LINENO: $BASH_COMMAND (exit $?)"' ERR
+fi
+CURL=(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors)
 
 PY="${PYTHON:-python3}"
 OS="$(uname -s)"
@@ -23,15 +27,16 @@ fetch_ffmpeg() {
   if [[ "$OS" == "Darwin" ]]; then
     local plat; plat=$([[ "$ARCH" == "arm64" ]] && echo arm64 || echo amd64)
     # "latest" redirect only exists for ffmpeg.zip; ffprobe.zip sits in the same release folder
-    local url; url="$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+    local url; url="$("${CURL[@]}" -I -o /dev/null -w '%{url_effective}' \
       "https://ffmpeg.martin-riedl.de/redirect/latest/macos/${plat}/release/ffmpeg.zip")"
-    curl -fsSL "$url" -o "$tmp/ffmpeg.zip"
-    curl -fsSL "${url%/ffmpeg.zip}/ffprobe.zip" -o "$tmp/ffprobe.zip"
+    echo "    $url"
+    "${CURL[@]}" "$url" -o "$tmp/ffmpeg.zip"
+    "${CURL[@]}" "${url%/ffmpeg.zip}/ffprobe.zip" -o "$tmp/ffprobe.zip"
     unzip -oq "$tmp/ffmpeg.zip" -d "$CACHE"
     unzip -oq "$tmp/ffprobe.zip" -d "$CACHE"
   else
     [[ "$ARCH" == "x86_64" ]] || { echo "Linux build supports x86_64 only for now"; exit 1; }
-    curl -fsSL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o "$tmp/ff.tar.xz"
+    "${CURL[@]}" https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o "$tmp/ff.tar.xz"
     tar -xJf "$tmp/ff.tar.xz" -C "$tmp"
     cp "$tmp"/ffmpeg-*-static/ffmpeg "$tmp"/ffmpeg-*-static/ffprobe "$CACHE/"
   fi
@@ -69,7 +74,12 @@ if [[ "$OS" == "Darwin" ]]; then
   cp -R "$APP" "$STAGE/"
   ln -s /Applications "$STAGE/Applications"
   rm -f "release/$NAME.dmg"
-  hdiutil create -volname "Crusher" -srcfolder "$STAGE" -ov -format UDZO "release/$NAME.dmg" >/dev/null
+  # hdiutil sometimes fails with "Resource busy" on CI machines; retry a few times
+  for attempt in 1 2 3 4 5; do
+    hdiutil create -volname "Crusher" -srcfolder "$STAGE" -ov -format UDZO "release/$NAME.dmg" && break
+    [[ $attempt == 5 ]] && exit 1
+    echo "    hdiutil failed, retrying ($attempt)"; sleep 10
+  done
   echo "Done: release/$NAME.dmg"
 else
   echo "==> PyInstaller"
@@ -85,7 +95,7 @@ else
 
   TOOL="installer/appimagetool-x86_64.AppImage"
   if [[ ! -x "$TOOL" ]]; then
-    curl -fsSL https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -o "$TOOL"
+    "${CURL[@]}" https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -o "$TOOL"
     chmod +x "$TOOL"
   fi
   # extract-and-run: works without FUSE (CI runners, containers, WSL)
