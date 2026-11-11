@@ -7,7 +7,9 @@
 **Make any file small enough to send.**
 Right-click a file, click **Crush**, done. Perfect for Discord, email and WhatsApp limits.
 
-[**⬇ Download for Windows**](https://github.com/KumaStar/Crusher/releases/latest)
+[**⬇ Windows**](https://github.com/KumaStar/Crusher/releases/latest) &nbsp;·&nbsp;
+[**⬇ macOS**](https://github.com/KumaStar/Crusher/releases/latest) <sup>beta</sup> &nbsp;·&nbsp;
+[**⬇ Linux**](https://github.com/KumaStar/Crusher/releases/latest) <sup>beta</sup>
 
 <img src="docs/demo.gif" alt="Crusher shrinking a 44.7 MB video to 7.7 MB in a few seconds" width="500">
 
@@ -15,30 +17,75 @@ Right-click a file, click **Crush**, done. Perfect for Discord, email and WhatsA
 
 ---
 
-## Install (one step)
+## Install
 
-1. Download **`Crusher-Setup.exe`** from the [latest release](https://github.com/KumaStar/Crusher/releases/latest).
-2. Double-click it and press **Install**.
+Everything it needs is included (FFmpeg too). No Python, no admin rights.
+Pick your file from the [latest release](https://github.com/KumaStar/Crusher/releases/latest):
 
-That's it. Everything it needs is included, and no admin rights are required.
+| System | Download | Install |
+|---|---|---|
+| **Windows** 10/11 | `Crusher-Setup.exe` | Double-click → **Install** |
+| **macOS** Apple Silicon (M1–M4…) | `Crusher-mac-arm64.dmg` | Open it, drag **Crusher** into **Applications**, open Crusher once |
+| **macOS** Intel | `Crusher-mac-intel.dmg` | Same as above |
+| **Linux** (x86_64) | `Crusher-x86_64.AppImage` | Make it executable, then double-click it once |
 
-> **"Windows protected your PC"?** That warning shows up for new apps that aren't code-signed yet.
-> Click **More info → Run anyway**.
+<details>
+<summary><b>Windows says "Windows protected your PC"</b></summary>
+
+That warning shows up for new apps that aren't code-signed yet. Click **More info → Run anyway**.
+</details>
+
+<details>
+<summary><b>macOS says "Crusher can't be opened" / "Apple could not verify…"</b></summary>
+
+Crusher isn't signed with a paid Apple developer certificate yet, so macOS blocks the first launch.
+
+1. Click **Done** (not "Move to Trash").
+2. Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to Crusher.
+3. Open Crusher again and confirm.
+
+You only need to do this once.
+</details>
+
+<details>
+<summary><b>Linux: how to make the AppImage executable</b></summary>
+
+Right-click the file → **Properties → Permissions** → tick **Allow executing file as program**. Or in a terminal:
+
+```sh
+chmod +x Crusher-x86_64.AppImage
+./Crusher-x86_64.AppImage
+```
+
+Keep the AppImage somewhere permanent (for example `~/Applications`). If you move it later, open it once and the menus update themselves.
+</details>
+
+> macOS and Linux versions are **beta**: they're built and tested automatically, but haven't had many real users yet.
+> If something doesn't work, please [open an issue](https://github.com/KumaStar/Crusher/issues).
 
 ## How to use
 
 ### From the right-click menu (fastest)
 
-1. Right-click any file.
-2. On Windows 11, click **Show more options** first (or hold **Shift** while right-clicking).
-3. Choose **Crusher → Crush to target size**.
+Opening Crusher once adds it to your right-click menu.
+
+| System | Where to find it |
+|---|---|
+| **Windows 11** | Right-click → **Show more options** (or **Shift** + right-click) → **Crusher → Crush to target size** |
+| **Windows 10** | Right-click → **Crusher → Crush to target size** |
+| **macOS** | Right-click in Finder → **Quick Actions → Crush with Crusher** (it may be under **Services** on older macOS) |
+| **Linux: GNOME Files** | Right-click → **Scripts → Crush with Crusher** |
+| **Linux: KDE Dolphin** | Right-click → **Actions → Crush with Crusher** |
+| **Linux: Cinnamon Nemo** | Right-click → **Crush with Crusher** |
+
+On Linux you can also right-click a video, picture or document → **Open With → Crusher**.
 
 A new file appears next to the original, named like `holiday_video_crushed.mp4`.
 **Your original file is never changed.**
 
 ### From the app
 
-Open **Crusher** from the Start menu, click **Browse…**, choose a file, set the size you want, and press **Crush**.
+Open **Crusher** (Start menu, Applications folder or app menu), click **Browse…**, choose a file, set the size you want, and press **Crush**.
 
 <img src="docs/app.png" alt="Crusher window with a video loaded and the target set to 8 MB" width="420">
 
@@ -73,7 +120,8 @@ Files already under the target are left alone. If something can't get under the 
 
 ## Uninstall
 
-**Settings → Apps → Installed apps → Crusher → Uninstall.** This also removes the right-click menu.
+- **Windows**: **Settings → Apps → Installed apps → Crusher → Uninstall.** This also removes the right-click menu.
+- **macOS / Linux**: in Crusher, click ⚙ and untick **Right-click menu**, then **Save**. Then delete the app (drag Crusher from Applications to the Trash, or delete the AppImage).
 
 ---
 
@@ -91,11 +139,20 @@ py -m pip install -r requirements.txt     # customtkinter, Pillow, pikepdf (+ op
 py app.py                                 # open the app
 ```
 
+macOS / Linux: `python3 -m pip install -r requirements.txt` and `python3 app.py`. FFmpeg: `brew install ffmpeg` / your distro's package.
+
 Add the right-click menu for the source checkout (per user, no admin):
 
 ```powershell
+# Windows
 powershell -ExecutionPolicy Bypass -File .\install_context_menu.ps1
 powershell -ExecutionPolicy Bypass -File .\install_context_menu.ps1 -Uninstall
+```
+
+```sh
+# macOS / Linux
+python3 app.py --integrate        # Finder Quick Action, or GNOME/KDE/Nemo actions + .desktop entry
+python3 app.py --unintegrate
 ```
 
 </details>
@@ -143,21 +200,23 @@ Stored in `%APPDATA%\Crusher\config.json` (`~/Library/Application Support/Crushe
 </details>
 
 <details>
-<summary><b>Build the installer</b></summary>
+<summary><b>Build the installers</b></summary>
 
-Install [Inno Setup 6](https://jrsoftware.org/isinfo.php), then:
+Every build bundles the app with PyInstaller and a static FFmpeg (downloaded once and cached under `installer/`).
 
-```powershell
-.\build.ps1
-```
+| System | Command | Output |
+|---|---|---|
+| Windows | `.\build.ps1` (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)) | `installer\Output\Crusher-Setup.exe` |
+| macOS | `./build.sh` | `release/Crusher-mac-arm64.dmg` or `-intel.dmg` |
+| Linux x86_64 | `./build.sh` | `release/Crusher-x86_64.AppImage` |
 
-This bundles the app with PyInstaller, downloads FFmpeg into `installer\ffmpeg\` (cached), and writes `installer\Output\Crusher-Setup.exe`.
+Test a build: `python scripts/smoke_test.py <built binary> <ffmpeg>` crushes a generated video, image, PDF and text file and checks that each one fits.
 
-**Releasing:** push a version tag and GitHub Actions builds the installer and attaches it to the release:
+**Releasing:** push a version tag. GitHub Actions builds all four packages on Windows, macOS (Apple Silicon + Intel) and Ubuntu, smoke-tests each one, and publishes them in one release. Tags with a dash become pre-releases.
 
-```powershell
-git tag v1.0.1
-git push --tags
+```sh
+git tag v1.1.0-beta.1 && git push --tags   # pre-release
+git tag v1.1.0 && git push --tags          # release
 ```
 
 </details>
@@ -171,20 +230,26 @@ crusher/
   core.py                 config, FFmpeg lookup, Job (progress/cancel/ffmpeg runner). No UI, cross-platform
   engines/                one module per file type: analyze() / preview() / crush()
   gui.py                  CustomTkinter desktop window
+  integrate.py            macOS Quick Action / Linux file-manager actions (set up on first launch)
   __main__.py             CLI and entry point
-installer/crusher.iss     Inno Setup script (shortcuts + right-click menu)
-build.ps1                 PyInstaller + FFmpeg + installer build
-install_context_menu.ps1  right-click menu for source checkouts
+installer/crusher.iss     Inno Setup script (Windows shortcuts + right-click menu)
+build.ps1                 Windows build: PyInstaller + FFmpeg + installer
+build.sh                  macOS (.dmg) and Linux (.AppImage) build
+packaging/linux/          AppImage entry point and .desktop file
+scripts/smoke_test.py     end-to-end test of a built binary
+install_context_menu.ps1  Windows right-click menu for source checkouts
 docs/                     README images
 ```
 
 </details>
 
 <details>
-<summary><b>Roadmap: macOS and Android</b></summary>
+<summary><b>Roadmap: Android</b></summary>
 
-- **macOS**: `core`, `engines` and `gui` already run there (`brew install ffmpeg python-tk`). Still missing: a Finder Quick Action (Automator → Run Shell Script: `python3 /path/app.py --crush "$@"`) and an `.app` bundle.
-- **Android**: Tk doesn't run there. The plan is to keep `core` and `engines` and add a small touch UI (Kivy or BeeWare) in the Share menu, with FFmpeg via ffmpeg-kit. Engines take a path and return a path, so they carry over unchanged.
+Tk doesn't run on Android, and ffmpeg-kit (the usual way to ship FFmpeg in a Python Android app) was retired in 2025.
+The likely route is a small native app that appears in the **Share** menu, using Android's built-in encoders (Media3 Transformer) for video and audio and Bitmap compression for images. It would follow the same rules as the engines here (target size in, smallest file that fits out).
+
+Also on the list: Apple code signing and notarization (removes the "Open Anyway" step), Linux arm64, and a Flatpak.
 
 </details>
 

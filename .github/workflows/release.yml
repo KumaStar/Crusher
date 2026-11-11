@@ -1,5 +1,8 @@
 name: Release
 
+# Push a tag like v1.1.0 to build every platform and publish a GitHub Release.
+# Tags with a dash (v1.1.0-beta.1) are published as pre-releases.
+# "Run workflow" on the Actions tab builds and tests without publishing.
 on:
   push:
     tags:
@@ -10,23 +13,81 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
-
-      - name: Build installer
+      - name: Build
         shell: pwsh
         run: .\build.ps1
-
-      - name: Upload to release
-        uses: softprops/action-gh-release@v2
+      - name: Smoke test
+        run: python scripts/smoke_test.py dist/Crusher/Crusher.exe installer/ffmpeg/ffmpeg.exe
+      - uses: actions/upload-artifact@v4
         with:
-          files: installer/Output/Crusher-Setup.exe
+          name: windows
+          path: installer/Output/Crusher-Setup.exe
+
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest       # Apple Silicon
+            name: mac-arm64
+          - runner: macos-15-intel     # Intel
+            name: mac-intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build
+        run: PYTHON=python ./build.sh
+      - name: Smoke test
+        run: python scripts/smoke_test.py dist/Crusher.app/Contents/MacOS/Crusher dist/Crusher.app/Contents/MacOS/ffmpeg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: release/*.dmg
+
+  linux:
+    runs-on: ubuntu-22.04              # older glibc, so the AppImage runs on more distros
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: System packages
+        run: sudo apt-get update && sudo apt-get install -y libtk8.6 libtcl8.6 file
+      - name: Build
+        run: PYTHON=python ./build.sh
+      - name: Smoke test (the AppImage itself)
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: python scripts/smoke_test.py release/Crusher-x86_64.AppImage dist/Crusher/ffmpeg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: release/*.AppImage
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, macos, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: ls -la dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true

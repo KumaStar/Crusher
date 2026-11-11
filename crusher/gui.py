@@ -9,15 +9,17 @@ import threading
 from pathlib import Path
 
 import customtkinter as ctk
+import tkinter as tk
 from tkinter import filedialog, messagebox
 
-from . import engines
+from . import engines, integrate
 from .core import (APP_NAME, IS_WIN, KIND_LABELS, KINDS, MB, MISSING_FFMPEG_MSG, Cancelled, Info,
                    Job, Result, find_tool, fmt_size, fmt_time, save_config)
 from .engines.video import PRESETS
 
 RES_CHOICES = ["auto", "1080", "720", "540", "480", "360"]
 ICON = Path(__file__).resolve().parent.parent / "crusher.ico"
+ICON_PNG = ICON.with_suffix(".png")
 RED = ("#c0392b", "#ff6b6b")
 GREEN = ("#1e8449", "#58d68d")
 NEEDS_FFMPEG = {"video", "audio", "gif"}
@@ -33,11 +35,14 @@ def reveal(path: str) -> None:
 
 
 def set_icon(win) -> None:
-    if IS_WIN and ICON.is_file():
-        try:
+    try:
+        if IS_WIN and ICON.is_file():
             win.iconbitmap(str(ICON))
-        except Exception:  # noqa: BLE001
-            pass
+        elif not IS_WIN and ICON_PNG.is_file():
+            win._crusher_icon = tk.PhotoImage(file=str(ICON_PNG))   # keep a reference
+            win.iconphoto(True, win._crusher_icon)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 class SettingsWindow(ctk.CTkToplevel):
@@ -100,8 +105,16 @@ class SettingsWindow(ctk.CTkToplevel):
         ctk.CTkButton(self, text="…", width=32, command=lambda: self._pick(self.ffdir)
                       ).grid(row=r0 + 5, column=3, padx=(0, 12))
 
+        self.menu_var = None
+        if integrate.SUPPORTED:   # Windows: the installer owns the right-click menu
+            row(r0 + 6, "Right-click menu")
+            self.menu_var = ctk.BooleanVar(value=integrate.is_installed())
+            label = "Finder Quick Action" if integrate.IS_MAC else "File manager action"
+            ctk.CTkCheckBox(self, text=label, variable=self.menu_var
+                            ).grid(row=r0 + 6, column=1, columnspan=3, sticky="w", **pad)
+
         bar = ctk.CTkFrame(self, fg_color="transparent")
-        bar.grid(row=r0 + 6, column=0, columnspan=4, sticky="e", padx=12, pady=(12, 12))
+        bar.grid(row=r0 + 7, column=0, columnspan=4, sticky="e", padx=12, pady=(12, 12))
         ctk.CTkButton(bar, text="Cancel", width=90, fg_color="transparent", border_width=1,
                       text_color=("gray10", "gray90"), command=self.destroy).pack(side="right")
         ctk.CTkButton(bar, text="Save", width=90, command=self._save).pack(side="right", padx=8)
@@ -139,6 +152,16 @@ class SettingsWindow(ctk.CTkToplevel):
         self.cfg.update(targets=targets, max_height=self.res.get().rstrip("p"),
                         x264_preset=self.preset.get(), suffix=self.suffix.get().strip() or "_crushed",
                         output_dir=out_dir, ffmpeg_path=self.ffdir.get().strip())
+        if self.menu_var is not None and self.menu_var.get() != integrate.is_installed():
+            try:
+                if self.menu_var.get():
+                    integrate.install()
+                    self.cfg["shell_integration"] = integrate.launch_id()
+                else:
+                    integrate.uninstall()
+                    self.cfg["shell_integration"] = "off"
+            except OSError as e:
+                messagebox.showerror("Settings", f"Couldn't update the right-click menu:\n{e}", parent=self)
         save_config(self.cfg)
         self.on_save()
         self.destroy()

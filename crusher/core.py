@@ -41,6 +41,8 @@ DEFAULTS = {
     "suffix": "_crushed",
     "x264_preset": "medium",
     "ffmpeg_path": "",                   # folder with ffmpeg/ffprobe (optional)
+    "shell_integration": "",             # macOS/Linux right-click menu: "" never set up,
+                                         # "off" removed by the user, else the launch command it points at
 }
 
 

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Crusher
+Comment=Shrink any file to a target size
+Exec=Crusher %f
+Icon=crusher
+Terminal=false
+Categories=Utility;

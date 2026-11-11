@@ -5,8 +5,8 @@ import argparse
 import os
 import sys
 
-from . import engines
-from .core import KIND_LABELS, Cancelled, CrushError, Job, fmt_size, fmt_time, load_config
+from . import engines, integrate
+from .core import KIND_LABELS, Cancelled, CrushError, Job, fmt_size, fmt_time, load_config, save_config
 
 
 def run_cli(path: str, cfg: dict, target: float | None) -> int:
@@ -57,8 +57,12 @@ def main() -> int:
     ap.add_argument("--crush", metavar="FILE", help="start crushing FILE immediately")
     ap.add_argument("--target", type=float, help="target size in MB (overrides settings)")
     ap.add_argument("--nogui", action="store_true", help="console only (use with --crush)")
+    ap.add_argument("--integrate", action="store_true", help="add the right-click menu (macOS/Linux)")
+    ap.add_argument("--unintegrate", action="store_true", help="remove the right-click menu (macOS/Linux)")
     args = ap.parse_args()
     cfg = load_config()
+    if args.integrate or args.unintegrate:
+        return run_integrate(cfg, add=args.integrate)
     path = args.crush or args.file
     if path and not os.path.isfile(path):
         print(f"File not found: {path}", file=sys.stderr)
@@ -69,8 +73,26 @@ def main() -> int:
         if not path:
             ap.error("--nogui needs a file (e.g. --crush file.mp4 --nogui)")
         return run_cli(path, cfg, args.target)
+    integrate.sync(cfg, save_config)
     from .gui import run_gui
     run_gui(cfg, path, auto=bool(args.crush and path), target=args.target)
+    return 0
+
+
+def run_integrate(cfg: dict, add: bool) -> int:
+    if not integrate.SUPPORTED:
+        print("On Windows the right-click menu comes from the installer "
+              "(or install_context_menu.ps1 for a source checkout).")
+        return 1
+    if add:
+        integrate.install()
+        cfg["shell_integration"] = integrate.launch_id()
+    else:
+        integrate.uninstall()
+        cfg["shell_integration"] = "off"
+    save_config(cfg)
+    for p in integrate.paths():
+        print(("+ " if add else "- ") + str(p))
     return 0
 
 
