@@ -4,6 +4,10 @@
 # fatal errors, so exit codes are checked explicitly after each one instead.
 $ErrorActionPreference = "Continue"
 Set-Location $PSScriptRoot
+trap {   # on CI, surface the failing line as a visible annotation
+    if ($env:GITHUB_ACTIONS) { Write-Host "::error title=build.ps1 failed::line $($_.InvocationInfo.ScriptLineNumber): $_" }
+    break
+}
 
 $ffDir = Join-Path $PSScriptRoot "installer\ffmpeg"
 $ffUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
@@ -24,7 +28,13 @@ $ffExe = Join-Path $ffDir "ffmpeg.exe"
 if (-not (Test-Path $ffExe)) {
     New-Item -ItemType Directory -Force -Path $ffDir | Out-Null
     $zip = Join-Path $ffDir "ffmpeg.zip"
-    Invoke-WebRequest -Uri $ffUrl -OutFile $zip -ErrorAction Stop
+    for ($attempt = 1; ; $attempt++) {   # the download host is occasionally flaky
+        try { Invoke-WebRequest -Uri $ffUrl -OutFile $zip -ErrorAction Stop; break }
+        catch {
+            if ($attempt -ge 5) { throw "FFmpeg download failed: $_" }
+            Write-Host "FFmpeg download failed ($attempt), retrying: $_"; Start-Sleep -Seconds 10
+        }
+    }
     Expand-Archive -Path $zip -DestinationPath $ffDir -Force -ErrorAction Stop
     $bin = Get-ChildItem -Path $ffDir -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
     Copy-Item (Join-Path $bin.DirectoryName "ffmpeg.exe"), (Join-Path $bin.DirectoryName "ffprobe.exe") -Destination $ffDir -Force -ErrorAction Stop
